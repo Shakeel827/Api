@@ -1,4 +1,3 @@
-# api.py
 from fastapi import FastAPI, HTTPException, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import database
@@ -6,10 +5,9 @@ import tempfile
 import shutil
 import pandas as pd
 
-# ---------------- FastAPI Setup ----------------
 app = FastAPI(title="Jobs API")
 
-# Enable CORS for your frontend (replace "*" with your frontend domain in production)
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,12 +16,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------------- Root Endpoint ----------------
+# ---------------- Endpoints ----------------
 @app.get("/")
 def root():
     return {"message": "Jobs API is running!"}
 
-# ---------------- Get All Jobs ----------------
 @app.get("/jobs")
 def get_jobs():
     try:
@@ -38,14 +35,13 @@ def get_jobs():
                 "description": row[5],
                 "application_link": row[6],
                 "created_at": row[7]
-            } 
+            }
             for row in rows
         ]
         return {"jobs": jobs}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ---------------- Get Single Job by ID ----------------
 @app.get("/jobs/{job_id}")
 def get_job(job_id: int):
     try:
@@ -65,7 +61,6 @@ def get_job(job_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ---------------- Search / Filter Jobs ----------------
 @app.get("/jobs/search")
 def search_jobs(
     title: str = Query(None),
@@ -99,14 +94,12 @@ def search_jobs(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ---------------- Upload Excel File ----------------
 @app.post("/jobs/upload-excel")
 def upload_excel(file: UploadFile = File(...)):
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
             shutil.copyfileobj(file.file, tmp)
             tmp_path = tmp.name
-        # Import jobs from Excel
         database.bulk_add_jobs_from_excel(tmp_path)
         return {"message": "Jobs uploaded successfully!"}
     except Exception as e:
@@ -115,5 +108,4 @@ def upload_excel(file: UploadFile = File(...)):
 # ---------------- Run Server ----------------
 if __name__ == "__main__":
     import uvicorn
-    # Only run server locally; in production, use a WSGI server or Render settings
-    uvicorn.run("api:app", host="0.0.0.0", port=8009, reload=True)
+    uvicorn.run("api:app", host="0.0.0.0", port=10000, reload=True)
