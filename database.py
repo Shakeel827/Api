@@ -5,12 +5,12 @@ import os
 
 # ---------------- Database Path ----------------
 # Use Render persistent volume
-DB_FILE = "/mnt/data/jobs.db"
-os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
+DB_PATH = os.getenv("DB_PATH", "/tmp/jobs.db")
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 # ---------------- Initialize DB ----------------
 def init_db():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
@@ -31,7 +31,7 @@ init_db()
 
 # ---------------- CRUD Operations ----------------
 def get_all_jobs():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM jobs ORDER BY id DESC")
     rows = cursor.fetchall()
@@ -39,7 +39,7 @@ def get_all_jobs():
     return rows
 
 def add_job(title, company, location, job_type, description, application_link):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO jobs (title, company, location, job_type, description, application_link, created_at)
@@ -49,7 +49,7 @@ def add_job(title, company, location, job_type, description, application_link):
     conn.close()
 
 def update_job(job_id, title, company, location, job_type, description, application_link):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
         UPDATE jobs
@@ -60,14 +60,14 @@ def update_job(job_id, title, company, location, job_type, description, applicat
     conn.close()
 
 def delete_job(job_id):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM jobs WHERE id=?", (job_id,))
     conn.commit()
     conn.close()
 
 def clear_jobs():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM jobs")
     conn.commit()
