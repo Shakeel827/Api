@@ -2,7 +2,7 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 
-DB_FILE = "jobs.db"
+DB_FILE = "E:\jobs.db"
 
 def init_db():
     """
