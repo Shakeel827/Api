@@ -1,86 +1,146 @@
 import sqlite3
 import pandas as pd
 from datetime import datetime
-import os
 
-# ---------------- Database Path ----------------
-# Use Render persistent volume
-DB_PATH = os.getenv("DB_PATH", "/tmp/jobs.db")
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+DB_FILE = "jobs.db"
 
-# ---------------- Initialize DB ----------------
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    """
+    Initialize SQLite database and create jobs table.
+    Enables WAL mode for concurrency.
+    """
+    conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL;")  # Allow concurrent reads/writes
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT,
-            company TEXT,
+            title TEXT NOT NULL,
+            company TEXT NOT NULL,
             location TEXT,
             job_type TEXT,
             description TEXT,
             application_link TEXT,
-            created_at TEXT
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
     conn.commit()
     conn.close()
 
-init_db()
 
-# ---------------- CRUD Operations ----------------
-def get_all_jobs():
-    conn = sqlite3.connect(DB_PATH)
+def add_job(title, company, location="", job_type="", description="", application_link=""):
+    """
+    Add a single job to the database.
+    """
+    conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM jobs ORDER BY id DESC")
+    cursor.execute("""
+        INSERT INTO jobs (title, company, location, job_type, description, application_link)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (title, company, location, job_type, description, application_link))
+    conn.commit()
+    conn.close()
+
+
+def bulk_add_jobs_from_excel(file_path):
+    """
+    Import jobs from an Excel file (xlsx) into the database.
+    Expected columns: title, company, location, job_type, description, application_link
+    """
+    df = pd.read_excel(file_path)
+
+    # Ensure all necessary columns exist
+    for col in ["title", "company", "location", "job_type", "description", "application_link"]:
+        if col not in df.columns:
+            df[col] = ""
+
+    jobs = df[["title", "company", "location", "job_type", "description", "application_link"]].values.tolist()
+
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.executemany("""
+        INSERT INTO jobs (title, company, location, job_type, description, application_link)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, jobs)
+    conn.commit()
+    conn.close()
+
+
+def get_all_jobs():
+    """
+    Fetch all jobs from the database, ordered by newest first.
+    Returns a list of tuples.
+    """
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, title, company, location, job_type, description, application_link, created_at
+        FROM jobs
+        ORDER BY created_at DESC
+    """)
     rows = cursor.fetchall()
     conn.close()
     return rows
 
-def add_job(title, company, location, job_type, description, application_link):
-    conn = sqlite3.connect(DB_PATH)
+
+def update_job(job_id, title=None, company=None, location=None, job_type=None, description=None, application_link=None):
+    """
+    Update a job by id. Only non-None fields will be updated.
+    """
+    conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO jobs (title, company, location, job_type, description, application_link, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (title, company, location, job_type, description, application_link, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    
+    # Build dynamic query
+    fields = []
+    values = []
+    if title is not None:
+        fields.append("title = ?")
+        values.append(title)
+    if company is not None:
+        fields.append("company = ?")
+        values.append(company)
+    if location is not None:
+        fields.append("location = ?")
+        values.append(location)
+    if job_type is not None:
+        fields.append("job_type = ?")
+        values.append(job_type)
+    if description is not None:
+        fields.append("description = ?")
+        values.append(description)
+    if application_link is not None:
+        fields.append("application_link = ?")
+        values.append(application_link)
+
+    values.append(job_id)
+    sql = f"UPDATE jobs SET {', '.join(fields)} WHERE id = ?"
+    cursor.execute(sql, values)
     conn.commit()
     conn.close()
 
-def update_job(job_id, title, company, location, job_type, description, application_link):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE jobs
-        SET title=?, company=?, location=?, job_type=?, description=?, application_link=?
-        WHERE id=?
-    """, (title, company, location, job_type, description, application_link, job_id))
-    conn.commit()
-    conn.close()
 
 def delete_job(job_id):
-    conn = sqlite3.connect(DB_PATH)
+    """
+    Delete a job by id.
+    """
+    conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM jobs WHERE id=?", (job_id,))
+    cursor.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
     conn.commit()
     conn.close()
 
+
 def clear_jobs():
-    conn = sqlite3.connect(DB_PATH)
+    """
+    Delete all jobs from the database.
+    """
+    conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM jobs")
     conn.commit()
     conn.close()
 
-def bulk_add_jobs_from_excel(file_path):
-    df = pd.read_excel(file_path)
-    for _, row in df.iterrows():
-        add_job(
-            row.get("title",""),
-            row.get("company",""),
-            row.get("location",""),
-            row.get("job_type",""),
-            row.get("description",""),
-            row.get("application_link","")
-        )
+
+# Initialize DB automatically
+init_db()
