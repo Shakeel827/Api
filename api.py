@@ -1,26 +1,30 @@
-from fastapi import FastAPI, HTTPException, Query, UploadFile, File
+# api.py
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-import database
-import tempfile
-import shutil
-import pandas as pd
+import database  # your existing database.py
 
+# FastAPI instance
 app = FastAPI(title="Jobs API")
 
-# Enable CORS
+# Enable CORS for your frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Replace "*" with your frontend URL if needed
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---------------- Endpoints ----------------
+# ---------------------------
+# API Endpoints
+# ---------------------------
+
+# Root endpoint
 @app.get("/")
 def root():
     return {"message": "Jobs API is running!"}
 
+# GET all jobs
 @app.get("/jobs")
 def get_jobs():
     try:
@@ -42,6 +46,7 @@ def get_jobs():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# GET single job by ID
 @app.get("/jobs/{job_id}")
 def get_job(job_id: int):
     try:
@@ -61,6 +66,7 @@ def get_job(job_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# GET search/filter jobs
 @app.get("/jobs/search")
 def search_jobs(
     title: str = Query(None),
@@ -94,18 +100,9 @@ def search_jobs(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/jobs/upload-excel")
-def upload_excel(file: UploadFile = File(...)):
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
-            shutil.copyfileobj(file.file, tmp)
-            tmp_path = tmp.name
-        database.bulk_add_jobs_from_excel(tmp_path)
-        return {"message": "Jobs uploaded successfully!"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ---------------- Run Server ----------------
+# ---------------------------
+# Run server
+# ---------------------------
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("api:app", host="0.0.0.0", port=10000, reload=True)
+    uvicorn.run("api:app", host="0.0.0.0", port=8009, reload=True)
